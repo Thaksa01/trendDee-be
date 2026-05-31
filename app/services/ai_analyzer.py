@@ -1,6 +1,6 @@
 import json
 import anthropic
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from app.core.config import settings
 from app.core.supabase import get_supabase
 
@@ -13,17 +13,30 @@ async def analyze_daily_news(news_date: date | None = None) -> dict:
     db = get_supabase()
     today = (news_date or date.today()).isoformat()
 
+    # ใช้ 48 ชั่วโมงย้อนหลัง เพื่อรองรับ timezone difference และข่าวที่ fetch ก่อนหน้า
+    since = (datetime.now(timezone.utc) - timedelta(hours=48)).isoformat()
+
     rows = (
         db.table("news_articles")
-        .select("title, content, source")
-        .gte("published_at", f"{today}T00:00:00")
-        .lte("published_at", f"{today}T23:59:59")
+        .select("title, content, source, published_at")
+        .gte("published_at", since)
+        .order("published_at", desc=True)
         .limit(30)
         .execute()
     )
 
+    # fallback: ถ้ายังไม่มีข่าวใน 48 ชม. ใช้ข่าวล่าสุดที่มีอยู่
     if not rows.data:
-        return {}
+        rows = (
+            db.table("news_articles")
+            .select("title, content, source, published_at")
+            .order("published_at", desc=True)
+            .limit(30)
+            .execute()
+        )
+
+    if not rows.data:
+        return {"error": "ไม่มีข่าวในระบบ กรุณา Fetch ข่าวก่อน"}
 
     news_text = "\n\n".join(
         f"[{r['source']}] {r['title']}\n{r.get('content', '')[:300]}"
