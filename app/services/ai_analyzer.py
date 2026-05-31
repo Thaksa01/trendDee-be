@@ -4,7 +4,8 @@ from datetime import date, datetime, timedelta, timezone
 from app.core.config import settings
 from app.core.supabase import get_supabase
 
-client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+def _client() -> anthropic.Anthropic:
+    return anthropic.Anthropic(api_key=settings.anthropic_api_key)
 
 SECTORS = "AGRO, CONSUMP, FINCIAL, INDUS, PROPCON, RESOURC, SERVICE, TECH, FUND_EQUITY, FUND_FIXED, FUND_REIT, FUND_GLOBAL, FX_MAJOR, FX_ASIA"
 
@@ -43,7 +44,7 @@ async def analyze_daily_news(news_date: date | None = None) -> dict:
         for r in rows.data
     )
 
-    response = client.messages.create(
+    response = _client().messages.create(
         model="claude-sonnet-4-5",
         max_tokens=2000,
         messages=[{
@@ -91,7 +92,7 @@ async def analyze_daily_news(news_date: date | None = None) -> dict:
 
 
 async def classify_news_sectors(article_id: str, title: str, content: str) -> list[str]:
-    response = client.messages.create(
+    response = _client().messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=200,
         messages=[{
